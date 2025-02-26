@@ -1,6 +1,5 @@
 // pages/api/register-bot.js
 import admin from 'firebase-admin';
-import path from 'path';
 
 // Ensure you only initialize once
 if (!admin.apps.length) {
