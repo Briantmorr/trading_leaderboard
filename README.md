@@ -1,36 +1,109 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Trading Bots Leaderboard
+
+A Next.js application that displays a leaderboard for trading bots using data from Firebase and account details fetched from the Alpaca paper trading API. Bots can be registered via an API endpoint, and their account values (including portfolio value and cash) are updated via another API endpoint.
+
+## Table of Contents
+
+- [Features](#features)
+- [Getting Started](#getting-started)
+- [Environment Variables](#environment-variables)
+- [API Endpoints](#api-endpoints)
+  - [Register Bot](#register-bot)
+  - [Update Leaderboard](#update-leaderboard)
+- [Running the Project](#running-the-project)
+- [Deployment](#deployment)
+- [License](#license)
+
+## Features
+
+- **Bot Registration**: Register trading bots by providing a bot name and Alpaca account ID.
+- **Live Leaderboard**: Display a table of bots showing rank, bot name, portfolio value (total account worth), and date created.
+- **Real-Time Updates**: Firestore listeners update the leaderboard in real time.
+- **Alpaca Integration**: Uses the [alpaca-trade-api-js](https://github.com/alpacahq/alpaca-trade-api-js) SDK to fetch account data from Alpaca.
 
 ## Getting Started
 
-First, run the development server:
+### Prerequisites
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+- [Node.js](https://nodejs.org/) (v14+ recommended)
+- [npm](https://www.npmjs.com/) or [Yarn](https://yarnpkg.com/)
+- A Firebase project with Firestore enabled.
+- Alpaca paper trading account credentials.
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### Installation
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+1. **Clone the Repository:**
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+   ```bash
+   git clone https://github.com/yourusername/trading-bots-leaderboard.git
+   cd trading-bots-leaderboard
 
-## Learn More
+2. **Install Dependencies:**
 
-To learn more about Next.js, take a look at the following resources:
+    ```bash
+    npm install
+3. **Install Tailwind CSS (if not already installed):**
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+    ```bash
+    npm install -D tailwindcss postcss autoprefixer
+    npx tailwindcss init -p
+4. **Configure Tailwind:**
+    ```js
+    module.exports = {
+    content: [
+        "./src/app/**/*.{js,ts,jsx,tsx}",
+        "./src/pages/**/*.{js,ts,jsx,tsx}",
+        "./src/components/**/*.{js,ts,jsx,tsx}",
+    ],
+    theme: {
+        extend: {},
+    },
+    plugins: [],
+    };
+## Environment Variables
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Create a .env.local file in the project root with the following (replace the placeholder values with your actual credentials):
 
-## Deploy on Vercel
+    ```env
+    # Firebase Client Config (public)
+    FIREBASE_SERVICE_ACCOUNT={service_account object credentials}
+    TEAM_TOKEN=test
+## API Endpoints
+#### Register Bot
+- Endpoint: /api/register-bot
+- Method: POST
+- Headers:
+    - Content-Type: application/json
+    - Authorization: Bearer YOUR_TEAM_TOKEN (if authorization is implemented)
+- Payload:
+    ```json
+    {
+    "bot_name": "algo_trading_brian",
+    "alpaca_account_key": "PA3HW4R6GYF2",
+    "alpaca_account_secret": "1234
+    }
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+#### Update Leaderboard
+- Endpoint: /api/update-leaderboard
+- Method: POST
+- Headers:
+    - Content-Type: application/json
+    - Authorization: Bearer YOUR_TEAM_TOKEN (if authorization is implemented)
+- Response Example:
+    ```json
+    {
+    "message": "Leaderboard updated successfully",
+    "results": [
+        {
+            "bot": "algo_trading_brian",
+            "status": "updated",
+            "portfolio_value": 105000,
+        },
+        {
+            "bot": "other_bot",
+            "status": "failed",
+            "error": "Error message"
+        }
+      ]
+    }
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
