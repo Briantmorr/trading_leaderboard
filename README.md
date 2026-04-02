@@ -1,109 +1,79 @@
-# Trading Bots Leaderboard
+# Trading Leaderboard
 
-A Next.js application that displays a leaderboard for trading bots using data from Firebase and account details fetched from the Alpaca paper trading API. Bots can be registered via an API endpoint, and their account values (including portfolio value and cash) are updated via another API endpoint.
+Next.js frontend for the Alpaca trading prototype leaderboard.
 
-## Table of Contents
+This repo used to be built around Firebase plus one Alpaca paper account per bot. That model is now deprecated.
+The active frontend reads the backend snapshot/artifact contract produced by:
+- `capstone_ai_trading_bots/artifacts/<run_id>/leaderboard_snapshot.json`
+- optional drilldown files like `trade_log.json` and `paper_run.json`
 
-- [Features](#features)
-- [Getting Started](#getting-started)
-- [Environment Variables](#environment-variables)
-- [API Endpoints](#api-endpoints)
-  - [Register Bot](#register-bot)
-  - [Update Leaderboard](#update-leaderboard)
-- [Running the Project](#running-the-project)
-- [Deployment](#deployment)
-- [License](#license)
+## What changed
 
-## Features
+### Old model
+- register each bot with its own Alpaca credentials
+- push leaderboard state into Firebase
+- subscribe to Firestore in the UI
 
-- **Bot Registration**: Register trading bots by providing a bot name and Alpaca account ID.
-- **Live Leaderboard**: Display a table of bots showing rank, bot name, portfolio value (total account worth), and date created.
-- **Real-Time Updates**: Firestore listeners update the leaderboard in real time.
-- **Alpaca Integration**: Uses the [alpaca-trade-api-js](https://github.com/alpacahq/alpaca-trade-api-js) SDK to fetch account data from Alpaca.
+### New model
+- shared Alpaca paper account on the backend
+- local attribution + artifact generation on the backend
+- frontend reads backend snapshots as the source of truth
 
-## Getting Started
+## Current pages and APIs
 
-### Prerequisites
+### UI
+- `/` — server-rendered leaderboard against the latest backend snapshot
 
-- [Node.js](https://nodejs.org/) (v14+ recommended)
-- [npm](https://www.npmjs.com/) or [Yarn](https://yarnpkg.com/)
-- A Firebase project with Firestore enabled.
-- Alpaca paper trading account credentials.
+### Local API routes
+- `GET /api/leaderboard/latest` — latest normalized leaderboard payload
+- `GET /api/bots/:botName/latest` — latest detail payload for a bot in the current snapshot
 
-### Installation
+### Deprecated routes
+These now return `410 Gone` to make the migration explicit:
+- `POST /api/register-bot`
+- `POST /api/update-leaderboard`
 
-1. **Clone the Repository:**
+## Dev data loading
 
-   ```bash
-   git clone https://github.com/yourusername/trading-bots-leaderboard.git
-   cd trading-bots-leaderboard
+The app resolves backend data in this order:
 
-2. **Install Dependencies:**
+1. Latest backend artifact under `../capstone_ai_trading_bots/artifacts/`
+2. Fallback example payload at `../capstone_ai_trading_bots/docs/examples.leaderboard_snapshot.json`
 
-    ```bash
-    npm install
-3. **Install Tailwind CSS (if not already installed):**
+You can override the backend repo location with:
 
-    ```bash
-    npm install -D tailwindcss postcss autoprefixer
-    npx tailwindcss init -p
-4. **Configure Tailwind:**
-    ```js
-    module.exports = {
-    content: [
-        "./src/app/**/*.{js,ts,jsx,tsx}",
-        "./src/pages/**/*.{js,ts,jsx,tsx}",
-        "./src/components/**/*.{js,ts,jsx,tsx}",
-    ],
-    theme: {
-        extend: {},
-    },
-    plugins: [],
-    };
-## Environment Variables
+```bash
+BACKEND_REPO_PATH=/absolute/or/relative/path/to/capstone_ai_trading_bots
+```
 
-Create a .env.local file in the project root with the following (replace the placeholder values with your actual credentials):
+## Running locally
 
-    ```env
-    # Firebase Client Config (public)
-    FIREBASE_SERVICE_ACCOUNT={service_account object credentials}
-    TEAM_TOKEN=test
-## API Endpoints
-#### Register Bot
-- Endpoint: /api/register-bot
-- Method: POST
-- Headers:
-    - Content-Type: application/json
-    - Authorization: Bearer YOUR_TEAM_TOKEN (if authorization is implemented)
-- Payload:
-    ```json
-    {
-    "bot_name": "algo_trading_brian",
-    "alpaca_account_key": "PA3HW4R6GYF2",
-    "alpaca_account_secret": "1234
-    }
+```bash
+npm install
+npm run build
+npm run dev
+```
 
-#### Update Leaderboard
-- Endpoint: /api/update-leaderboard
-- Method: POST
-- Headers:
-    - Content-Type: application/json
-    - Authorization: Bearer YOUR_TEAM_TOKEN (if authorization is implemented)
-- Response Example:
-    ```json
-    {
-    "message": "Leaderboard updated successfully",
-    "results": [
-        {
-            "bot": "algo_trading_brian",
-            "status": "updated",
-            "portfolio_value": 105000,
-        },
-        {
-            "bot": "other_bot",
-            "status": "failed",
-            "error": "Error message"
-        }
-      ]
-    }
+Then open <http://localhost:3000>.
 
+## Backend integration notes
+
+### Dev
+For local development, generate backend artifacts first, then start this frontend.
+The frontend will automatically read the latest artifact directory.
+
+### Future production shape
+The backend contract is already suitable for a lightweight API layer such as:
+- `GET /api/leaderboard/latest`
+- `GET /api/bots/:bot_name/latest`
+- `GET /api/runs/:run_id`
+
+In production, those routes can be backed by:
+- a shared filesystem/volume,
+- object storage,
+- or a small service that exposes the latest artifact bundle.
+
+## Shared-account caveat
+
+Paper mode uses a shared Alpaca paper account with local order attribution.
+Per-bot equity/cash/PnL should therefore be labeled as estimated shared-account allocation when sourced from paper reconciliation rather than broker-native account splits.

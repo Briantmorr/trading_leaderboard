@@ -1,117 +1,185 @@
-'use client';
+import { getLatestLeaderboardData } from '@/lib/leaderboard-data';
 
-import { useEffect, useState } from 'react';
-import { initializeApp, getApps } from 'firebase/app';
-import { getFirestore, collection, onSnapshot } from 'firebase/firestore';
-
-// Firebase configuration loaded from .env.local
-const firebaseConfig = {
-    apiKey: "AIzaSyCK6Syo623VvTzK-3hFAA-uffK20w4XwwE",
-    authDomain: "stock-trading-leaderboard.firebaseapp.com",
-    projectId: "stock-trading-leaderboard",
-    storageBucket: "stock-trading-leaderboard.firebasestorage.app",
-    messagingSenderId: "17596831673",
-    appId: "1:17596831673:web:78a6c5334eeee09ee04868"
-  };
-
-  const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
-const db = getFirestore(app);
-
-// 3. Bot interface
-interface Bot {
-  bot_name: string;
-  portfolio_value: number;
-  timestamp: number; // e.g. 1740533078154
+function formatCurrency(value: number) {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    maximumFractionDigits: 2,
+  }).format(value);
 }
 
-// 4. Format date as MM/DD/YY
-function formatDate(timestamp: number): string {
-  return new Date(timestamp).toLocaleDateString('en-US', {
-    month: '2-digit',
-    day: '2-digit',
-    year: '2-digit',
+function formatDateTime(value?: string) {
+  if (!value) return '—';
+  return new Date(value).toLocaleString('en-US', {
+    dateStyle: 'medium',
+    timeStyle: 'short',
   });
 }
 
-// 5. Return a label with an emoji badge for top 3 ranks
-function getRankLabel(rank: number): string {
-  if (rank === 1) return '🥇 1';
-  if (rank === 2) return '🥈 2';
-  if (rank === 3) return '🥉 3';
-  return `${rank}`;
+function rankBadge(rank: number) {
+  if (rank === 1) return '🥇';
+  if (rank === 2) return '🥈';
+  if (rank === 3) return '🥉';
+  return '#';
 }
 
-export default function Home() {
-  const [bots, setBots] = useState<Bot[]>([]);
-  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
-
-  useEffect(() => {
-    // Subscribe to the 'bots' collection
-    const unsubscribe = onSnapshot(collection(db, 'bots'), (snapshot) => {
-      const data = snapshot.docs.map((doc) => doc.data()) as Bot[];
-
-      // Sort by portfolio_value descending
-      data.sort((a, b) => b.portfolio_value - a.portfolio_value);
-      setBots(data);
-      setLastUpdated(new Date());
-    });
-
-    return () => unsubscribe();
-  }, []);
+export default async function Home() {
+  const { snapshot, artifactPath, fallback, backendRepoPath } = await getLatestLeaderboardData();
 
   return (
-    <main className="min-h-screen bg-gray-100">
-      {/* Header: black background */}
-      <header className="bg-black py-6 mb-8 text-white">
-        <h1 className="text-4xl font-bold text-center">Trading Bots Leaderboard</h1>
-        {lastUpdated && (
-          <p className="text-center mt-2 text-sm text-gray-200">
-            Last Updated: {lastUpdated.toLocaleTimeString()}
-          </p>
-        )}
-      </header>
+    <main className="min-h-screen bg-slate-950 text-slate-100">
+      <section className="mx-auto flex max-w-7xl flex-col gap-8 px-4 py-10 sm:px-6 lg:px-8">
+        <header className="rounded-3xl border border-slate-800 bg-slate-900/80 p-8 shadow-2xl shadow-slate-950/40">
+          <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+            <div className="space-y-3">
+              <p className="text-sm font-semibold uppercase tracking-[0.25em] text-cyan-300">
+                Alpaca Trading Prototype
+              </p>
+              <h1 className="text-4xl font-bold tracking-tight sm:text-5xl">
+                Shared-account leaderboard
+              </h1>
+              <p className="max-w-3xl text-sm text-slate-300 sm:text-base">
+                This frontend now renders the backend snapshot contract instead of Firebase bot records.
+                Rankings come from the latest backend artifact when available, with an example snapshot as a
+                local fallback.
+              </p>
+            </div>
+            <div className="grid gap-3 rounded-2xl border border-slate-800 bg-slate-950/70 p-4 text-sm text-slate-300 sm:grid-cols-2">
+              <div>
+                <div className="text-slate-500">Source</div>
+                <div className="font-medium text-slate-100">{snapshot.source}</div>
+              </div>
+              <div>
+                <div className="text-slate-500">Generated</div>
+                <div className="font-medium text-slate-100">{formatDateTime(snapshot.generated_at)}</div>
+              </div>
+              <div>
+                <div className="text-slate-500">Run ID</div>
+                <div className="break-all font-medium text-slate-100">{snapshot.run_id}</div>
+              </div>
+              <div>
+                <div className="text-slate-500">Data path</div>
+                <div className="font-medium text-slate-100">{fallback === 'artifact' ? 'backend artifact' : 'example snapshot'}</div>
+              </div>
+            </div>
+          </div>
+        </header>
 
-      {/* Table Container */}
-      <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8">
-        <div className="overflow-x-auto bg-white shadow-md rounded-lg">
-          <table className="min-w-full text-sm text-gray-700">
-            <thead className="bg-gray-100 text-xs uppercase text-gray-700">
-              <tr>
-                <th className="px-6 py-3 w-24 text-left font-medium">Rank</th>
-                <th className="px-6 py-3 text-left font-medium">Bot Name</th>
-                <th className="px-6 py-3 text-right font-medium">Portfolio Value</th>
-                <th className="px-6 py-3 text-right font-medium">Date Created</th>
-              </tr>
-            </thead>
-            <tbody>
-              {bots.map((bot, index) => {
-                const rank = index + 1; // 1-based rank
-                // Highlight row if rank <= 3
-                const highlight = rank <= 3 ? 'bg-yellow-50' : '';
-                return (
-                  <tr
-                    key={bot.bot_name + rank}
-                    className={`${highlight} border-b last:border-b-0 hover:bg-gray-50 transition`}
-                  >
-                    <td className="px-6 py-4 font-semibold">
-                      {getRankLabel(rank)}
+        <section className="grid gap-4 md:grid-cols-3">
+          <div className="rounded-2xl border border-slate-800 bg-slate-900 p-5">
+            <div className="text-sm text-slate-400">Bots in snapshot</div>
+            <div className="mt-2 text-3xl font-semibold">{snapshot.bots.length}</div>
+          </div>
+          <div className="rounded-2xl border border-slate-800 bg-slate-900 p-5">
+            <div className="text-sm text-slate-400">Contract version</div>
+            <div className="mt-2 text-3xl font-semibold">{snapshot.contract_version}</div>
+          </div>
+          <div className="rounded-2xl border border-slate-800 bg-slate-900 p-5">
+            <div className="text-sm text-slate-400">Backend repo bridge</div>
+            <div className="mt-2 break-all text-sm font-medium text-slate-200">{backendRepoPath}</div>
+          </div>
+        </section>
+
+        <section className="overflow-hidden rounded-3xl border border-slate-800 bg-slate-900 shadow-2xl shadow-slate-950/30">
+          <div className="border-b border-slate-800 px-6 py-4">
+            <h2 className="text-xl font-semibold">Leaderboard snapshot</h2>
+            <p className="mt-1 text-sm text-slate-400">
+              Estimated per-bot values are rendered from the backend artifact contract. Shared-account paper mode should be labeled as estimated allocation.
+            </p>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-left text-sm">
+              <thead className="bg-slate-950/80 text-slate-400">
+                <tr>
+                  <th className="px-6 py-4 font-medium">Rank</th>
+                  <th className="px-6 py-4 font-medium">Bot</th>
+                  <th className="px-6 py-4 font-medium">Mode</th>
+                  <th className="px-6 py-4 text-right font-medium">Equity</th>
+                  <th className="px-6 py-4 text-right font-medium">Cash</th>
+                  <th className="px-6 py-4 text-right font-medium">Trades</th>
+                  <th className="px-6 py-4 font-medium">Halt</th>
+                  <th className="px-6 py-4 font-medium">Warnings</th>
+                  <th className="px-6 py-4 font-medium">Last equity point</th>
+                </tr>
+              </thead>
+              <tbody>
+                {snapshot.bots.map((bot) => (
+                  <tr key={`${bot.bot_name}-${bot.rank}`} className="border-t border-slate-800 align-top hover:bg-slate-800/40">
+                    <td className="px-6 py-4 font-semibold text-slate-100">
+                      <span className="mr-2">{rankBadge(bot.rank)}</span>
+                      {bot.rank}
                     </td>
-                    <td className="px-6 py-4 font-medium text-gray-900">
-                      {bot.bot_name}
+                    <td className="px-6 py-4">
+                      <div className="font-semibold text-slate-100">{bot.bot_name}</div>
                     </td>
-                    <td className="px-6 py-4 text-right font-medium">
-                      ${bot.portfolio_value.toLocaleString()}
+                    <td className="px-6 py-4 text-slate-300">{bot.mode}</td>
+                    <td className="px-6 py-4 text-right font-medium text-emerald-300">{formatCurrency(bot.ending_equity)}</td>
+                    <td className="px-6 py-4 text-right text-slate-200">{formatCurrency(bot.ending_cash)}</td>
+                    <td className="px-6 py-4 text-right text-slate-200">{bot.trade_count}</td>
+                    <td className="px-6 py-4">
+                      <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${bot.halted ? 'bg-rose-500/20 text-rose-200' : 'bg-emerald-500/20 text-emerald-200'}`}>
+                        {bot.halted ? 'halted' : 'active'}
+                      </span>
                     </td>
-                    <td className="px-6 py-4 text-right">
-                      {formatDate(bot.timestamp)}
+                    <td className="px-6 py-4">
+                      {bot.warnings.length === 0 ? (
+                        <span className="text-slate-500">None</span>
+                      ) : (
+                        <ul className="space-y-2 text-xs text-amber-200">
+                          {bot.warnings.map((warning) => (
+                            <li key={warning} className="rounded-xl bg-amber-500/10 px-3 py-2">
+                              {warning}
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 text-slate-300">
+                      {bot.last_equity_point ? (
+                        <div className="space-y-1">
+                          <div>{formatDateTime(bot.last_equity_point.timestamp)}</div>
+                          <div className="text-xs text-slate-500">{formatCurrency(bot.last_equity_point.equity)}</div>
+                        </div>
+                      ) : (
+                        '—'
+                      )}
                     </td>
                   </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      </div>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
+          <div className="rounded-3xl border border-slate-800 bg-slate-900 p-6">
+            <h2 className="text-xl font-semibold">How dev data loading works</h2>
+            <ol className="mt-4 space-y-3 text-sm text-slate-300">
+              <li>1. The frontend looks for the latest run inside the backend repo&apos;s <code className="rounded bg-slate-950 px-1.5 py-0.5">artifacts/</code> directory.</li>
+              <li>2. If a current artifact exists, it reads <code className="rounded bg-slate-950 px-1.5 py-0.5">leaderboard_snapshot.json</code> and optional trade detail files from there.</li>
+              <li>3. If no artifact exists yet, it falls back to <code className="rounded bg-slate-950 px-1.5 py-0.5">docs/examples.leaderboard_snapshot.json</code>.</li>
+              <li>4. You can override the backend path with <code className="rounded bg-slate-950 px-1.5 py-0.5">BACKEND_REPO_PATH</code>.</li>
+            </ol>
+          </div>
+          <div className="rounded-3xl border border-slate-800 bg-slate-900 p-6">
+            <h2 className="text-xl font-semibold">Current backend bridge</h2>
+            <div className="mt-4 space-y-3 text-sm text-slate-300">
+              <div>
+                <div className="text-slate-500">Resolved backend repo</div>
+                <div className="break-all font-medium text-slate-100">{backendRepoPath}</div>
+              </div>
+              <div>
+                <div className="text-slate-500">Latest artifact</div>
+                <div className="break-all font-medium text-slate-100">{artifactPath ?? 'No artifact found — using example snapshot'}</div>
+              </div>
+              <div>
+                <div className="text-slate-500">API</div>
+                <div className="font-medium text-slate-100">/api/leaderboard/latest and /api/bots/[botName]/latest</div>
+              </div>
+            </div>
+          </div>
+        </section>
+      </section>
     </main>
   );
 }
